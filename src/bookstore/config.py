@@ -8,6 +8,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class DatabaseConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        case_sensitive=False,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     DATABASE_HOST: str = "localhost"
     DATABASE_USER: str = "postgres"
     DATABASE_PASSWORD: SecretStr = SecretStr("postgres")
@@ -16,36 +23,50 @@ class DatabaseConfig(BaseSettings):
     DATABASE_URI: PostgresDsn | None = None
 
     @model_validator(mode="before")
-    def parse_db_uri(self) -> "DatabaseConfig":
-        self.DATABASE_URI = PostgresDsn.build(
+    def parse_db_uri(cls, values) -> "DatabaseConfig":
+        values["DATABASE_URI"] = PostgresDsn.build(
             scheme="postgresql+asyncpg",
-            username=self.DATABASE_USER,
-            password=self.DATABASE_PASSWORD.get_secret_value(),
-            host=self.DATABASE_HOST,
-            path=f"/{self.DATABASE_NAME}",
-            port=self.DATABASE_PORT,
+            username=values["DATABASE_USER"],
+            password=values["DATABASE_PASSWORD"],
+            host=values["DATABASE_HOST"],
+            path=f"/{values["DATABASE_NAME"]}",
+            port=int(values["DATABASE_PORT"]),
         )
-        return self
+        return values
 
 
 class RedisConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        case_sensitive=False,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: SecretStr = SecretStr("redis")
     REDIS_URI: RedisDsn | None = None
 
     @model_validator(mode="before")
-    def parse_redis_uri(self) -> "RedisConfig":
-        self.REDIS_URI = RedisDsn.build(
+    def parse_redis_uri(cls, values) -> "RedisConfig":
+        values["REDIS_URI"] = RedisDsn.build(
             scheme="redis",
-            host=self.REDIS_HOST,
-            port=self.REDIS_PORT,
-            password=self.REDIS_PASSWORD.get_secret_value(),
+            host=values["REDIS_HOST"],
+            port=int(values["REDIS_PORT"]),
+            password=values["REDIS_PASSWORD"],
         )
-        return self
+        return values
 
 
 class AuthConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        case_sensitive=False,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     JWT_SECRET_KEY: SecretStr = SecretStr(secrets.token_urlsafe(32))
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60

@@ -1,8 +1,8 @@
-"""Migrations for books package
+"""Initial migrations
 
-Revision ID: 2869d1723c89
-Revises: 31df6bc85038
-Create Date: 2025-03-19 17:44:41.985272
+Revision ID: f46187300410
+Revises: 
+Create Date: 2025-03-20 23:14:01.013959
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '2869d1723c89'
-down_revision: Union[str, None] = '31df6bc85038'
+revision: str = 'f46187300410'
+down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -29,6 +29,32 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id', name=op.f('pk_book_categories'))
     )
     op.create_index(op.f('ix_book_categories_name'), 'book_categories', ['name'], unique=True)
+    op.create_table('users',
+    sa.Column('email', sa.String(), nullable=False),
+    sa.Column('hashed_password', sa.String(), nullable=False),
+    sa.Column('role', sa.Enum('ADMIN', 'LIBRARIAN', 'READER', name='userrole'), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('is_superuser', sa.Boolean(), nullable=False),
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_users'))
+    )
+    op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
+    op.create_table('api_keys',
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('api_key_hash', sa.String(), nullable=False),
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('last_used_at', sa.TIMESTAMP(timezone=True), nullable=True),
+    sa.Column('last_used_ip', sa.String(), nullable=True),
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_api_keys_user_id_users')),
+    sa.PrimaryKeyConstraint('user_id', 'id', name=op.f('pk_api_keys'))
+    )
+    op.create_index(op.f('ix_api_keys_api_key_hash'), 'api_keys', ['api_key_hash'], unique=True)
     op.create_table('book_titles',
     sa.Column('title', sa.String(), nullable=False),
     sa.Column('author', sa.String(), nullable=False),
@@ -46,7 +72,6 @@ def upgrade() -> None:
     op.create_index(op.f('ix_book_titles_isbn'), 'book_titles', ['isbn'], unique=True)
     op.create_index(op.f('ix_book_titles_title'), 'book_titles', ['title'], unique=False)
     op.create_table('books',
-    sa.Column('title_id', sa.UUID(), nullable=False),
     sa.Column('book_title_id', sa.UUID(), nullable=False),
     sa.Column('edition', sa.String(), nullable=False),
     sa.Column('published_year', sa.Integer(), nullable=False),
@@ -56,7 +81,6 @@ def upgrade() -> None:
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['book_title_id'], ['book_titles.id'], name=op.f('fk_books_book_title_id_book_titles')),
-    sa.ForeignKeyConstraint(['title_id'], ['book_titles.id'], name=op.f('fk_books_title_id_book_titles')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_books'))
     )
     op.create_index(op.f('ix_books_barcode'), 'books', ['barcode'], unique=True)
@@ -71,6 +95,10 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_book_titles_isbn'), table_name='book_titles')
     op.drop_index(op.f('ix_book_titles_author'), table_name='book_titles')
     op.drop_table('book_titles')
+    op.drop_index(op.f('ix_api_keys_api_key_hash'), table_name='api_keys')
+    op.drop_table('api_keys')
+    op.drop_index(op.f('ix_users_email'), table_name='users')
+    op.drop_table('users')
     op.drop_index(op.f('ix_book_categories_name'), table_name='book_categories')
     op.drop_table('book_categories')
     # ### end Alembic commands ###

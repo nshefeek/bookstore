@@ -1,5 +1,5 @@
 from uuid import UUID
-from typing import Annotated, List
+from typing import List
 
 from fastapi import APIRouter, Depends, Query, status
 

@@ -37,8 +37,15 @@ class BookTitle(Base, UUIDMixin, TimeStampMixin):
     publisher: Mapped[str] = mapped_column(String, nullable=False)
     category_id: Mapped[UUID] = mapped_column(ForeignKey("book_categories.id"), nullable=False)
 
-    category: Mapped[BookCategory] = relationship(back_populates="books")
-    copies: Mapped[List["Book"]] = relationship(back_populates="title", cascade="all, delete-orphan")
+    category: Mapped[BookCategory] = relationship(
+        back_populates="books",
+        lazy="selectin"
+    )
+    copies: Mapped[List["Book"]] = relationship(
+        back_populates="book_title",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
 
 
 class Book(Base, UUIDMixin, TimeStampMixin):
@@ -50,6 +57,6 @@ class Book(Base, UUIDMixin, TimeStampMixin):
     barcode: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     status: Mapped[BookStatus] = mapped_column(default=BookStatus.AVAILABLE, nullable=False)
 
-    book_title: Mapped[BookTitle] = relationship(back_populates="copies")
-    borrow_records: Mapped[List["BorrowRecord"]] = relationship(back_populates="book", cascade="all, delete-orphan")
-    book_requests: Mapped[List["BookRequest"]] = relationship(back_populates="book", cascade="all, delete-orphan")
+    book_title: Mapped[BookTitle] = relationship(back_populates="copies", lazy="selectin")
+    borrow_records: Mapped[List["BorrowRecord"]] = relationship(back_populates="book", cascade="all, delete-orphan", lazy="selectin")
+    book_requests: Mapped[List["BookRequest"]] = relationship(back_populates="book", cascade="all, delete-orphan", lazy="selectin")

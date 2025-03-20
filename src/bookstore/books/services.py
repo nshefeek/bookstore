@@ -70,7 +70,8 @@ class BookService:
         return await self.book_title_repository.get_by_isbn(isbn, include_copies)
     
     async def get_all_titles(self, limit: int = 100, offset: int = 0) -> List[BookTitle]:
-        return await self.book_title_repository.get_all(limit, offset)
+        result = await self.book_title_repository.get_all(limit, offset)
+        return result
     
     async def create_title(self, title_data: BookTitleCreate) -> BookTitle:
         category = await self.book_category_repository.get_by_id(title_data.category_id)
@@ -129,7 +130,7 @@ class BookService:
         return await self.book_repository.get_all_available_for_title(title_id)
     
     async def create_book(self, book_data: BookCreate) -> Book:
-        title = await self.book_title_repository.get_by_id(book_data.title_id)
+        title = await self.book_title_repository.get_by_id(book_data.book_title_id)
         if not title:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

@@ -1,5 +1,5 @@
 from uuid import UUID
-from typing import List
+from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, Query, status
 
@@ -88,7 +88,7 @@ async def delete_category(
 
 
 @router.post(
-    "/",
+    "/titles",
     response_model=BookTitleResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new book title",
@@ -103,7 +103,7 @@ async def create_book(
 
 
 @router.get(
-    "/",
+    "/titles",
     response_model=list[BookTitleResponse],
     status_code=status.HTTP_200_OK,
     summary="Get all book titles",
@@ -118,7 +118,70 @@ async def get_all_titles(
 
 
 @router.get(
-    "/{title_id}",
+    "/titles/search",
+    response_model=BookTitleSearchResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Search for book title",
+    tags=["books"]
+)
+async def search_titles(
+    params: Annotated[BookTitleSearchParams, Query(...)],
+    service: BookService = Depends(get_book_service),
+):
+    items = []
+    books, total = await service.search_titles(params)
+
+    for book in books:
+        if book.copies:
+            available_copies = sum(1 for copy in book.copies if copy.status == BookStatus.AVAILABLE)
+            total_copies = len(book.copies)
+            
+            data = BookTitleResponse.model_validate(book)
+            data.available_copies = available_copies
+            data.total_copies = total_copies
+            items.append(data)
+
+    total_pages = (total + params.limit - 1) // params.limit if total > 0 else 0
+    return BookTitleSearchResponse(
+        items=items,
+        total=total,
+        page=params.page,
+        limit=params.limit,
+        pages=total_pages,
+    )
+
+
+@router.put(
+    "/titles/{title_id}",
+    response_model=BookTitleResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update a book title",
+    tags=["books"]
+)
+async def update_title(
+    title_id: UUID,
+    data: BookTitleUpdate,
+    user: User = Depends(user_is_librarian_or_admin),
+    service: BookService = Depends(get_book_service)
+):
+    return await service.update_title(title_id, data)
+
+
+@router.delete(
+    "/titles/{title_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a book title",
+    tags=["books"],
+)
+async def delete_title(
+    title_id: UUID,
+    user: User = Depends(user_is_librarian_or_admin),
+    service: BookService = Depends(get_book_service)
+):
+    return await service.delete_title(title_id)
+
+@router.get(
+    "/titles/{title_id}",
     response_model=BookTitleDetailResponse,
     status_code=status.HTTP_200_OK,
     summary="Get a specific book title",
@@ -136,6 +199,7 @@ async def get_title_by_id(
             available_copies = sum(1 for copy in title.copies if copy.status == BookStatus.AVAILABLE)
             total_copies = len(title.copies)
 
+
         data = BookTitleResponse.model_validate(title)
         data.available_copies = available_copies
         data.total_copies = total_copies
@@ -146,7 +210,7 @@ async def get_title_by_id(
 
 
 @router.get(
-    "/{isbn}",
+    "/titles/{isbn}",
     response_model=BookTitleDetailResponse,
     status_code=status.HTTP_200_OK,
     summary="Get a specific title using the ISBN",
@@ -173,69 +237,6 @@ async def get_title_by_isbn(
     
     return await service.get_title_by_isbn(isbn)
 
-
-@router.get(
-    "/search",
-    response_model=BookTitleSearchResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Search for book title",
-    tags=["books"]
-)
-async def search_titles(
-    params: BookTitleSearchParams = Query(),
-    service: BookService = Depends(get_book_service),
-):
-    items = []
-    books, total = await service.search_titles(params)
-
-    for book in books:
-        if book.copies:
-            available_copies = sum(1 for copy in book.copies if copy.status == BookStatus.AVAILABLE)
-            total_copies = len(book.copies)
-            
-        data = BookTitleResponse.model_validate(book)
-        data.available_copies = available_copies
-        data.total_copies = total_copies
-        items.append(data)
-
-    total_pages = (total + params.limit - 1) // params.limit if total > 0 else 0
-    return BookTitleSearchResponse(
-        items=items,
-        total=total,
-        page=params.page,
-        limit=params.limit,
-        pages=total_pages,
-    )
-
-
-@router.put(
-    "/{title_id}",
-    response_model=BookTitleResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Update a book title",
-    tags=["books"]
-)
-async def update_title(
-    title_id: UUID,
-    data: BookTitleUpdate,
-    user: User = Depends(user_is_librarian_or_admin),
-    service: BookService = Depends(get_book_service)
-):
-    return await service.update_title(title_id, data)
-
-
-@router.delete(
-    "/{title_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a book title",
-    tags=["books"],
-)
-async def delete_title(
-    title_id: UUID,
-    user: User = Depends(user_is_librarian_or_admin),
-    service: BookService = Depends(get_book_service)
-):
-    return await service.delete_title(title_id)
 
 
 @router.post(

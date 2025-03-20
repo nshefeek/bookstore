@@ -116,7 +116,7 @@ class BookTitleRepository:
         if title:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Title already exists",
+                detail="Title with the ISBN already exists",
             )
         title = BookTitle(**title_data.model_dump())
         self.session.add(title)

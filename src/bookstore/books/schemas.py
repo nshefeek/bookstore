@@ -28,6 +28,7 @@ class BookCategoryResponse(BookCategoryBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {UUID: str}
 
 
 class BookTitleBase(BaseModel):
@@ -37,6 +38,9 @@ class BookTitleBase(BaseModel):
     description: Optional[str] = None
     publisher: str
     category_id: UUID
+
+    class Config:
+        json_encoders = {UUID: str}
 
 
 class BookTitleCreate(BookTitleBase):
@@ -53,11 +57,14 @@ class BookTitleUpdate(BaseModel):
 
 
 class BookBase(BaseModel):
-    title_id: UUID
+    book_title_id: UUID
     edition: str
     published_year: int
     barcode: str
     status: BookStatus = Field(default=BookStatus.AVAILABLE)
+
+    class Config:
+        json_encoders = {UUID: str}
 
 
 class BookCreate(BookBase):
@@ -71,6 +78,9 @@ class BookUpdate(BaseModel):
     barcode: Optional[str] = None
     status: Optional[BookStatus] = None
 
+    class Config:
+        json_encoders = {UUID: str}
+
 
 class BookResponse(BookBase):
     id: UUID
@@ -79,6 +89,7 @@ class BookResponse(BookBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {UUID: str}
 
 
 class BookTitleResponse(BookTitleBase):
@@ -91,6 +102,7 @@ class BookTitleResponse(BookTitleBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {UUID: str}
 
 
 class BookTitleDetailResponse(BookTitleResponse):

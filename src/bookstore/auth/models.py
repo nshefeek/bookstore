@@ -27,7 +27,6 @@ class User(Base, UUIDMixin, TimeStampMixin):
         "APIKey",
         back_populates="user",
         cascade="all, delete-orphan",
-        lazy="selectin",
     )
 
 

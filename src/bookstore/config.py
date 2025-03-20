@@ -85,6 +85,9 @@ class Config(BaseSettings):
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = False
 
+    ADMIN_EMAIL: str = "admin@bookstore.com"
+    ADMIN_PASSWORD: SecretStr = SecretStr("password123")
+
     CORS_ORIGINS: List[AnyHttpUrl] = []
 
     RATE_LIMITER_ENABLED: bool = False

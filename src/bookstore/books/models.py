@@ -1,12 +1,15 @@
 from enum import Enum
 from uuid import UUID
-from typing import List
+from typing import List, TYPE_CHECKING
 
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from sqlalchemy import String, Integer
 
 from bookstore.database.models import Base, TimeStampMixin, UUIDMixin
+
+if TYPE_CHECKING:
+    from bookstore.borrowing.models import BookRequest, BorrowRecord
 
 
 class BookStatus(str, Enum):
@@ -41,7 +44,6 @@ class BookTitle(Base, UUIDMixin, TimeStampMixin):
 class Book(Base, UUIDMixin, TimeStampMixin):
     __tablename__ = "books"
 
-    title_id: Mapped[UUID] = mapped_column(ForeignKey("book_titles.id"), nullable=False)
     book_title_id: Mapped[UUID] = mapped_column(ForeignKey("book_titles.id"), nullable=False)
     edition: Mapped[str] = mapped_column(String, nullable=False)
     published_year: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -49,3 +51,5 @@ class Book(Base, UUIDMixin, TimeStampMixin):
     status: Mapped[BookStatus] = mapped_column(default=BookStatus.AVAILABLE, nullable=False)
 
     book_title: Mapped[BookTitle] = relationship(back_populates="copies")
+    borrow_records: Mapped[List["BorrowRecord"]] = relationship(back_populates="book", cascade="all, delete-orphan")
+    book_requests: Mapped[List["BookRequest"]] = relationship(back_populates="book", cascade="all, delete-orphan")

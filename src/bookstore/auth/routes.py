@@ -13,7 +13,7 @@ from .dependencies import (
 )
 
 
-router = APIRouter()
+router = APIRouter(tags=["auth"])
 
 
 @router.post("/users", status_code=status.HTTP_201_CREATED, response_model=UserResponse)

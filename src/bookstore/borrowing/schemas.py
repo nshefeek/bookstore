@@ -14,6 +14,9 @@ class BorrowRecord(BaseModel):
     borrowed_date: Optional[datetime] = datetime.now(timezone.utc)
     due_date: Optional[datetime] = None
 
+    class Config:
+        json_encoders = {UUID: str}
+
 
 class BorrowRecordCreate(BorrowRecord):
     pass
@@ -33,10 +36,14 @@ class BorrowRecordResponse(BorrowRecord):
 
     class Config:
         from_attributes = True
+        json_encoders = {UUID: str}
 
 
 class ReturnRequest(BaseModel):
     borrow_id: UUID
+
+    class Config:
+        json_encoders = {UUID: str}
 
 
 class BorrowHistoryFilter(BaseModel):
@@ -48,6 +55,9 @@ class BorrowHistoryFilter(BaseModel):
 class BookRequest(BaseModel):
     book_id: UUID
     reader_id: UUID
+
+    class Config:
+        json_encoders = {UUID: str}
 
 
 class BookRequestCreate(BookRequest):
@@ -64,6 +74,7 @@ class BookRequestResponse(BookRequest):
 
     class Config:
         from_attributes = True
+        json_encoders = {UUID: str}
 
 
 class BookRequestUpdate(BookRequest):
@@ -74,3 +85,6 @@ class BookRequestFilter(BaseModel):
     book_id: Optional[UUID] = None
     reader_id: Optional[UUID] = None
     status: Optional[List[BookRequestStatus]] = None
+
+    class Config:
+        json_encoders = {UUID: str}

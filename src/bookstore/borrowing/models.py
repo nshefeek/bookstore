@@ -52,7 +52,7 @@ class BorrowRecord(Base, TimeStampMixin, UUIDMixin):
     status: Mapped[BorrowStatus] = mapped_column(default=BorrowStatus.BORROWED, nullable=False)
 
     book: Mapped["Book"] = relationship(back_populates="borrow_records")
-    user: Mapped["User"] = relationship(back_populates="borrow_records")
+    # user: Mapped["User"] = relationship(back_populates="borrow_records")
 
 
 class BookRequest(Base, TimeStampMixin, UUIDMixin):
@@ -68,6 +68,6 @@ class BookRequest(Base, TimeStampMixin, UUIDMixin):
     status: Mapped[BookRequestStatus] = mapped_column(
         default=BookRequestStatus.PENDING, nullable=False
     )
-    book: Mapped["Book"] = relationship(back_populates="borrow_requests")
-    user: Mapped["User"] = relationship(back_populates="borrow_requests")
+    book: Mapped["Book"] = relationship(back_populates="book_requests")
+    # user: Mapped["User"] = relationship(back_populates="borrow_requests")
 

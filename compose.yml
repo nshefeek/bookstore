@@ -1,6 +1,6 @@
 services:
   cache:
-    image: redis:latest
+    image: redis:7.4-alpine
     ports:
       - "6379:6379"
     hostname: cache
@@ -23,7 +23,7 @@ services:
       timeout: 3s
       retries: 30
   db:
-    image: postgres:latest
+    image: postgres:15-alpine
     ports:
       - "5432:5432"
     hostname: db
@@ -50,6 +50,20 @@ services:
       interval: 2s
       timeout: 3s
       retries: 40
+  migration:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      - db
+    environment:
+      - DATABASE_HOST=${DATABASE_HOST}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_NAME=${DATABASE_NAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+    env_file:
+      - .env.docker
   app:
     build:
       context: .
@@ -61,6 +75,8 @@ services:
         condition: service_healthy
       cache:
         condition: service_healthy
+      migration:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
     environment:

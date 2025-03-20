@@ -29,7 +29,7 @@ class DatabaseConfig(BaseSettings):
             username=values["DATABASE_USER"],
             password=values["DATABASE_PASSWORD"],
             host=values["DATABASE_HOST"],
-            path=f"/{values["DATABASE_NAME"]}",
+            path=values["DATABASE_NAME"],
             port=int(values["DATABASE_PORT"]),
         )
         return values

@@ -11,10 +11,14 @@ from .utils import (
     decode_token,
 )
 
+from bookstore.logger import get_logger
+
 from .models import User, UserRole
 from .repositories import UserRepository, APIKeyRepository
-from .schemas import UserCreate, UserUpdate, UserResponse,TokenPayload, Token, APIKeyCreate,APIKeyFullResponse
+from .schemas import UserCreate, UserUpdate, UserResponse,TokenPayload, Token, APIKeyCreate, APIKeyFullResponse, LoginResponse
 
+
+logger = get_logger("auth.services")
 
 class AuthService:
     def __init__(
@@ -64,7 +68,7 @@ class AuthService:
         users = await self.user_repository.get_all_users(skip, limit)
         return [UserResponse.model_validate(user) for user in users]
 
-    async def authenticate_user(self, email: str, password: str) -> tuple[UserResponse, Token]:
+    async def authenticate_user(self, email: str, password: str) -> LoginResponse:
         user = await self.get_user_by_email(email)
         if not user or verify_password(password, user.hashed_password) is False:
             raise HTTPException(
@@ -80,9 +84,12 @@ class AuthService:
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        access_token = await self.create_access_token(UserResponse.model_validate(user))
-        return UserResponse.model_validate(user), Token(access_token=access_token, token_type="bearer")
-    
+        access_token = await self.create_access_token(user.id)
+        return LoginResponse(
+            user=UserResponse.model_validate(user),
+            token=Token(access_token=access_token, token_type="bearer")
+        )
+
     async def change_password(self, user_id: UUID, old_password: str, new_password: str) -> UserResponse:
         user = await self.get_user_by_id(user_id)
         if not user or verify_password(old_password, user.hashed_password) is False:
@@ -95,19 +102,15 @@ class AuthService:
         await self.user_repository.update_user(user_id, user_update)
         return UserResponse.model_validate(user)
     
-    async def create_access_token(self, user: UserResponse) -> str:
-        payload = TokenPayload(
-            user_id=user.id,
-            email=user.email,
-            role=UserRole(user.role),
-            is_active=user.is_active,
-        )
-        return create_access_token(payload.model_dump())
+    async def create_access_token(self, user_id: UUID) -> str:
+        payload = TokenPayload(user_id=user_id)
+        return create_access_token(payload)
     
     async def validate_token(self, token: str) -> User:
         try:
+            logger.info("Validating token")
             payload = decode_token(token)
-            user_id = payload.get("user_id")
+            user_id = payload.get("sub")
 
             if user_id is None:
                 raise HTTPException(
@@ -116,20 +119,13 @@ class AuthService:
                     headers={"WWW-Authenticate": "Bearer"},
                 )
             
-            token_data = TokenPayload(
-                user_id=UUID(user_id),
-                email=payload.get("email"),
-                role=UserRole(payload.get("role")),
-                is_active=payload.get("is_active")
-            )
-
         except JWTError:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Could not validate credentials",
             )
 
-        user = await self.get_user_by_id(token_data.user_id)
+        user = await self.get_user_by_id(user_id)
         if user is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -154,7 +150,7 @@ class AuthService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found",
             )
-        api_key, raw_key = await self.api_key_repository.create_api_key(user_id, **api_key_data.model_dump())
+        api_key, raw_key = await self.api_key_repository.create_api_key(user_id, api_key_data)
         
         api_key_response = APIKeyFullResponse(
             id=api_key.id,

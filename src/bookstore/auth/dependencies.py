@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bookstore.config import config
+from bookstore.logger import get_logger
 from bookstore.database.session import get_session
 
 from .models import User, UserRole
@@ -12,8 +13,10 @@ from .repositories import UserRepository,APIKeyRepository
 from .services import AuthService
 
 
+logger = get_logger("auth.dependencies")
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{config.API_V1_STR}/auth/token")
-api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 async def get_auth_service(session: AsyncSession = Depends(get_session)) -> AuthService:
@@ -22,15 +25,18 @@ async def get_auth_service(session: AsyncSession = Depends(get_session)) -> Auth
     return AuthService(user_repository, api_key_repository)
 
 async def get_current_user(
-    token: Annotated[Optional[str], Security(oauth2_scheme)],
-    api_key: Annotated[Optional[str], Security(api_key_header)],
+    token: Annotated[Optional[str], Security(oauth2_scheme)] = None,
+    api_key: Annotated[Optional[str], Security(api_key_header)] = None,
     auth_service: AuthService = Depends(get_auth_service),
 ) -> User:
     if token:
+        logger.info("Validating token")
         return await auth_service.validate_token(token)
     elif api_key:
+        logger.info("Validating API key")
         return await auth_service.validate_api_key(api_key)
     else:
+        logger.info(token, api_key)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
@@ -41,6 +47,7 @@ async def get_current_user(
 def get_current_active_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
+    logger.info(current_user)
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user

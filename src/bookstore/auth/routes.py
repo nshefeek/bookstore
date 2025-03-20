@@ -3,8 +3,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+from bookstore.logger import get_logger
+
 from .models import User, UserRole
-from .schemas import UserCreate, UserUpdate, UserResponse, LoginResponse, APIKeyCreate, APIKeyFullResponse
+from .schemas import UserCreate, UserUpdate, UserResponse, LoginResponse, APIKeyCreate, APIKeyFullResponse, Token
 from .services import AuthService
 from .dependencies import (
     get_auth_service,
@@ -14,6 +16,7 @@ from .dependencies import (
 
 
 router = APIRouter(tags=["auth"])
+logger = get_logger("auth.routes")
 
 
 @router.post("/users", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
@@ -26,19 +29,35 @@ async def create_user(
         pass
     elif current_user.role == UserRole.LIBRARIAN and user.role != UserRole.READER:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
-    
+
     response = await auth_service.create_user(user)
     return response
 
 
-@router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), auth_service: AuthService = Depends(get_auth_service)):
+@router.post(
+    "/login", 
+    response_model=LoginResponse,
+    status_code=status.HTTP_200_OK
+)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    auth_service: AuthService = Depends(get_auth_service)
+):
     response = await auth_service.authenticate_user(form_data.username, form_data.password)
     return response
+
+@router.post("/token", response_model=Token)
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm= Depends(),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    response = await auth_service.authenticate_user(form_data.username, form_data.password)
+    return response.token
 
 
 @router.get("/me", response_model=UserResponse, status_code=status.HTTP_200_OK)
 async def get_current_user(current_user: User = Depends(get_current_active_user)):
+    logger.info(current_user)
     return UserResponse.model_validate(current_user)
 
 
@@ -113,34 +132,22 @@ async def delete_user(
     await auth_service.delete_user(user_id)
 
 
-@router.post("/users/{user-id}/api-keys", response_model=APIKeyFullResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/api-keys", response_model=APIKeyFullResponse, status_code=status.HTTP_201_CREATED)
 async def create_api_key(
-    user_id: UUID,
     api_key_data: APIKeyCreate,
     auth_service: AuthService = Depends(get_auth_service),
     current_user: User = Depends(get_current_active_user),
 ):
-    if current_user.id != user_id or current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions",
-        )
-    response = await auth_service.create_api_key(user_id, api_key_data)
+    response = await auth_service.create_api_key(current_user.id, api_key_data)
     return response
 
 
-@router.get("/users/{user-id}/api-keys", response_model=list[APIKeyFullResponse], status_code=status.HTTP_200_OK)
+@router.get("/api-keys", response_model=list[APIKeyFullResponse], status_code=status.HTTP_200_OK)
 async def get_api_keys(
-    user_id: UUID,
     auth_service: AuthService = Depends(get_auth_service),
     current_user: User = Depends(get_current_active_user),
 ):
-    if current_user.id != user_id or current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions",
-        )
-    response = await auth_service.get_api_keys(user_id)
+    response = await auth_service.get_api_keys(current_user.id)
     return response
 
 
@@ -151,7 +158,7 @@ async def delete_api_key(
     auth_service: AuthService = Depends(get_auth_service),
     current_user: User = Depends(get_current_active_user),
 ):
-    if current_user.id != user_id or current_user.role != UserRole.ADMIN:
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",

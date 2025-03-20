@@ -41,6 +41,7 @@ class UserinDB(UserBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {UUID: str}
 
 
 class UserResponse(UserinDB):
@@ -67,6 +68,7 @@ class APIKeyResponse(APIKeyBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {UUID: str}
 
 class APIKeyFullResponse(APIKeyResponse):
     key: str
@@ -81,6 +83,7 @@ class APIKeyinDB(APIKeyBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {UUID: str}
 
 
 class Token(BaseModel):
@@ -90,9 +93,6 @@ class Token(BaseModel):
 
 class TokenPayload(BaseModel):
     user_id: UUID
-    email: EmailStr | None
-    role: UserRole | None
-    is_active: bool | None
 
 
 class LoginRequest(BaseModel):

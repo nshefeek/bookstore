@@ -32,7 +32,7 @@ class UserRepository:
         return user is not None
 
     async def create_user(self, user: UserCreate) -> User:
-        if self.user_exists(user.email):
+        if not self.user_exists(user.email):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered",

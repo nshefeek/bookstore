@@ -1,5 +1,6 @@
 from typing import Annotated, Optional
 
+from click import Option
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,19 +25,20 @@ async def get_auth_service(session: AsyncSession = Depends(get_session)) -> Auth
     api_key_repository = APIKeyRepository(session)
     return AuthService(user_repository, api_key_repository)
 
+
 async def get_current_user(
-    token: Annotated[Optional[str], Security(oauth2_scheme)] = None,
-    api_key: Annotated[Optional[str], Security(api_key_header)] = None,
+    token: Annotated[Optional[str], Security(oauth2_scheme)],
+    api_key: Annotated[Optional[str], Security(api_key_header)],
     auth_service: AuthService = Depends(get_auth_service),
 ) -> User:
-    if token:
-        logger.info("Validating token")
-        return await auth_service.validate_token(token)
-    elif api_key:
-        logger.info("Validating API key")
+    logger.debug("Getting current user")
+    logger.debug(f"API key: {api_key}")
+    logger.debug(f"Token: {token}")
+    if api_key:
         return await auth_service.validate_api_key(api_key)
+    elif token:
+        return await auth_service.validate_token(token)
     else:
-        logger.info(token, api_key)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",

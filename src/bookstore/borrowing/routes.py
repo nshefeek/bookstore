@@ -15,6 +15,7 @@ from .schemas import (
     BorrowRecordCreate,
     BorrowRecordResponse,
     ReturnRequest,
+    BorrowRecordDetail,
 )
 from .services import BorrowService
 
@@ -33,15 +34,16 @@ async def borrow(
     borrow_data: BorrowRecordCreate,
     user: User = Depends(get_current_active_user),
     service: BorrowService = Depends(get_borrow_service),
-):
+):  
+    borrow_data.user_id = user.id
     record = await service.borrow_book(borrow_data)
     record_details = await service.get_borrow_details(record.id)
-    return BorrowRecordResponse(**record_details.model_dump())
+    return BorrowRecordResponse(**record_details)
 
 
 @router.post(
     "/return",
-    response_model=BorrowRecordResponse,
+    response_model=BorrowRecordDetail,
     status_code=status.HTTP_200_OK,
     summary="Return a book",
     tags=["borrowing"],
@@ -85,7 +87,7 @@ async def get_borrow_history(
     user: User = Depends(get_current_active_user),
     service: BorrowService = Depends(get_borrow_service),
 ):
-    borrows = await service.get_borrow_history(user.id, params)
+    borrows = await service.get_reader_borrow_history(user.id, params)
     return borrows
 
 

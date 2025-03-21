@@ -1,7 +1,7 @@
 from uuid import UUID
 from typing import Annotated, List
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException,Query, status
 
 from bookstore.auth.models import User
 from bookstore.auth.dependencies import user_is_librarian_or_admin
@@ -9,7 +9,23 @@ from bookstore.auth.dependencies import user_is_librarian_or_admin
 from .models import BookStatus
 from .services import BookCategoryService, BookService
 from .dependencies import get_category_service, get_book_service
-from .schemas import BookCategoryCreate, BookCategoryResponse, BookCategoryUpdate, BookCreate, BookResponse, BookTitleCreate, BookTitleDetailResponse, BookTitleResponse, BookTitleSearchParams, BookTitleSearchResponse, BookTitleUpdate, BookUpdate
+from .schemas import (
+    BookCategoryCreate,
+    BookCategoryResponse,
+    BookCategoryUpdate,
+    BookCategoryFilter,
+    BookCategoryDetailResponse,
+    BookCreate,
+    BookResponse,
+    BookTitleCreate,
+    BookTitleDetailResponse,
+    BookTitleResponse,
+    BookTitleFilter,
+    BookTitleSearchParams,
+    BookTitleSearchResponse,
+    BookTitleUpdate,
+    BookUpdate
+)
 
 
 router = APIRouter()
@@ -17,7 +33,7 @@ router = APIRouter()
 
 @router.post(
     "/categories",
-    response_model=BookCategoryResponse,
+    response_model=BookCategoryDetailResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new book category",
     tags=["categories"],
@@ -38,9 +54,10 @@ async def create_category(
     tags=["categories"],    
 )
 async def get_all_categories(
+    params: BookCategoryFilter = Depends(),
     service: BookCategoryService = Depends(get_category_service),
 ):
-    return await service.get_all_categories()
+    return await service.get_all_categories(params)
 
 
 @router.get(
@@ -104,17 +121,16 @@ async def create_book(
 
 @router.get(
     "/titles",
-    response_model=list[BookTitleResponse],
+    response_model=list[BookTitleDetailResponse],
     status_code=status.HTTP_200_OK,
     summary="Get all book titles",
     tags=["books"],
 )
 async def get_all_titles(
-    skip: int = 0,
-    limit: int = 100,
+    params: Annotated[BookTitleFilter, Query(...)],
     service: BookService = Depends(get_book_service),
 ):
-    return await service.get_all_titles(skip, limit)
+    return await service.get_all_titles(params)
 
 
 @router.get(
@@ -192,25 +208,27 @@ async def get_title_by_id(
     include_copies: bool = False,
     service: BookService = Depends(get_book_service),
 ):
-    if include_copies:
-        title = await service.get_title_by_id(title_id, include_copies=True)
+    title = await service.get_title_by_id(title_id, include_copies=include_copies)
 
-        if title and title.copies:
-            available_copies = sum(1 for copy in title.copies if copy.status == BookStatus.AVAILABLE)
-            total_copies = len(title.copies)
+    if not title:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Book title not found"
+        )
+    
+    data = BookTitleResponse.model_validate(title)
 
+    if title.copies:
+        available_copies = sum(1 for copy in title.copies if copy.status == BookStatus.AVAILABLE)
+        total_copies = len(title.copies)
 
-        data = BookTitleResponse.model_validate(title)
         data.available_copies = available_copies
         data.total_copies = total_copies
 
-        return data
-        
-    return await service.get_title_by_id(title_id)
-
+    return data
 
 @router.get(
-    "/titles/{isbn}",
+    "/titles/isbn/{isbn}",
     response_model=BookTitleDetailResponse,
     status_code=status.HTTP_200_OK,
     summary="Get a specific title using the ISBN",
@@ -224,14 +242,14 @@ async def get_title_by_isbn(
     if include_copies:
         title = await service.get_title_by_isbn(isbn, include_copies)
 
+        data = BookTitleDetailResponse.model_validate(title)
         if title and title.copies:
             available_copies = sum(1 for copy in title.copies if copy.status == BookStatus.AVAILABLE)
             total_copies = len(title.copies)
 
 
-        data = BookTitleDetailResponse.model_validate(title)
-        data.available_copies = available_copies
-        data.total_copies = total_copies
+            data.available_copies = available_copies
+            data.total_copies = total_copies
 
         return data
     

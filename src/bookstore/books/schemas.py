@@ -31,6 +31,18 @@ class BookCategoryResponse(BookCategoryBase):
         json_encoders = {UUID: str}
 
 
+class BookCategoryFilter(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    include_books: Optional[bool] = False
+    offset: Optional[int] = 0
+    limit: Optional[int] = 10
+
+
+class BookCategoryDetailResponse(BookCategoryResponse):
+    books: List["BookTitleDetailResponse"]
+
+
 class BookTitleBase(BaseModel):
     title: str
     author: str
@@ -104,6 +116,19 @@ class BookTitleResponse(BookTitleBase):
         from_attributes = True
         json_encoders = {UUID: str}
 
+
+class BookDetailResponse(BookBase):
+    book_title: BookTitleResponse
+
+class BookTitleFilter(BaseModel):
+    title: Optional[str] = None
+    author: Optional[str] = None
+    isbn: Optional[str] = None
+    publisher: Optional[str] = None
+    category_name: Optional[str] = None
+    include_copies: Optional[bool] = False
+    offset: Optional[int] = 0
+    limit: Optional[int] = 10
 
 class BookTitleDetailResponse(BookTitleResponse):
     copies: List[BookResponse] = []

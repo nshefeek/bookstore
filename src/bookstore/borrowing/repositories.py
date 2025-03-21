@@ -2,11 +2,12 @@ from uuid import UUID
 from datetime import datetime, timezone
 from typing import Any, List, Optional
 
+from fastapi import Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_, or_, desc
 
 from .models import BorrowRecord, BorrowStatus, BookRequest, BookRequestStatus
-from .schemas import BorrowRecordCreate, BorrowHistoryFilter, BookRequestFilter
+from .schemas import BorrowRecordCreate, BorrowHistoryFilter, BookRequestFilter, ReturnRequest
 
 
 class BorrowRecordRepository:
@@ -14,7 +15,7 @@ class BorrowRecordRepository:
         self.session = session
 
     async def get_active_borrow_for_book(self, book_id: UUID) -> Optional[BorrowRecord]:
-        active_statuses = (BorrowStatus.ACCEPTED, BorrowStatus.OVERDUE)
+        active_statuses = (BorrowStatus.BORROWED, BorrowStatus.OVERDUE)
         query = select(BorrowRecord).filter(
             BorrowRecord.book_id == book_id,
             BorrowRecord.status.in_(active_statuses),
@@ -25,16 +26,14 @@ class BorrowRecordRepository:
     async def get_reader_borrow_history(
         self,
         user_id: UUID,
-        status: Optional[List[BorrowStatus]] = None,
-        offset: int = 0,
-        limit: int = 100,
+        params: BorrowHistoryFilter = Query(...),
     ) -> List[BorrowRecord]:
         query = select(BorrowRecord).where(BorrowRecord.user_id == user_id)
 
-        if status:
-            query = query.filter(BorrowRecord.status.in_(status))
+        if params.borrow_status:
+            query = query.filter(BorrowRecord.status.in_(params.borrow_status))
 
-        query = query.order_by(desc(BorrowRecord.borrowed_date)).offset(offset).limit(limit)
+        query = query.order_by(desc(BorrowRecord.borrowed_date)).offset(params.offset).limit(params.limit)
 
         result = await self.session.execute(query)
         return result.scalars()._allrows()
@@ -64,21 +63,18 @@ class BorrowRecordRepository:
 
     async def mark_borrow_as_returned(
         self,
-        borrow_id: UUID,
-        returned_date: Optional[datetime] = None,
+        return_data: ReturnRequest,
     ) -> Optional[BorrowRecord]:
-        return_date = returned_date or datetime.now(timezone.utc)
-
         query = update(BorrowRecord).where(
             and_(
-                BorrowRecord.id == borrow_id,
+                BorrowRecord.id == return_data.borrow_id,
                 or_(
                     BorrowRecord.status == BorrowStatus.BORROWED,
                     BorrowRecord.status == BorrowStatus.OVERDUE,
                 )
             )
         ).values(
-            return_date=return_date,
+            return_date=return_data.returned_date,
             status=BorrowStatus.RETURNED,
         ).returning(BorrowRecord)
 
@@ -121,7 +117,7 @@ class BorrowRecordRepository:
         return result.scalar_one_or_none()
 
     async def create_borrow_record(self, data: BorrowRecordCreate) -> BorrowRecord:
-        new_record = BorrowRecord(**data)
+        new_record = BorrowRecord(**data.model_dump())
         self.session.add(new_record)
         await self.session.commit()
         await self.session.refresh(new_record)

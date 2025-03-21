@@ -58,5 +58,13 @@ class Book(Base, UUIDMixin, TimeStampMixin):
     status: Mapped[BookStatus] = mapped_column(default=BookStatus.AVAILABLE, nullable=False)
 
     book_title: Mapped[BookTitle] = relationship(back_populates="copies", lazy="selectin")
-    borrow_records: Mapped[List["BorrowRecord"]] = relationship(back_populates="book", cascade="all, delete-orphan", lazy="selectin")
-    book_requests: Mapped[List["BookRequest"]] = relationship(back_populates="book", cascade="all, delete-orphan", lazy="selectin")
+    borrow_records: Mapped[List["BorrowRecord"]] = relationship(
+        back_populates="book",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+    book_requests: Mapped[List["BookRequest"]] = relationship(
+        back_populates="book",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )

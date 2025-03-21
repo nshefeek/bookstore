@@ -5,14 +5,27 @@ from fastapi import Depends, HTTPException, status
 
 from .models import BookCategory, BookTitle, Book, BookStatus
 from .repositories import BookCategoryRepository, BookTitleRepository, BookRepository
-from .schemas import BookCategoryCreate, BookCategoryUpdate, BookTitleCreate, BookTitleUpdate, BookTitleSearchParams, BookCreate, BookUpdate
+from .schemas import (
+    BookCategoryCreate,
+    BookCategoryUpdate,
+    BookCategoryResponse,
+    BookCategoryFilter,
+    BookTitleCreate,
+    BookTitleUpdate,
+    BookTitleDetailResponse,
+    BookTitleFilter,
+    BookTitleSearchParams,
+    BookCreate,
+    BookUpdate,
+    BookResponse
+)
 
 class BookCategoryService:
     def __init__(self, repository: BookCategoryRepository = Depends()):
         self.repository = repository
 
-    async def get_all_categories(self) -> List[BookCategory]:
-        return await self.repository.get_all()
+    async def get_all_categories(self, params: BookCategoryFilter) -> List[BookCategory]:
+        return await self.repository.get_all(params)
     
     async def get_category_by_id(self, category_id: UUID) -> Optional[BookCategory]:
         return await self.repository.get_by_id(category_id)
@@ -69,9 +82,8 @@ class BookService:
     async def get_title_by_isbn(self, isbn: str, include_copies: bool = False) -> Optional[BookTitle]:
         return await self.book_title_repository.get_by_isbn(isbn, include_copies)
     
-    async def get_all_titles(self, limit: int = 100, offset: int = 0) -> List[BookTitle]:
-        result = await self.book_title_repository.get_all(limit, offset)
-        return result
+    async def get_all_titles(self, params: BookTitleFilter) -> List[BookTitleDetailResponse]:
+        return await self.book_title_repository.get_all_titles(params)
     
     async def create_title(self, title_data: BookTitleCreate) -> BookTitle:
         category = await self.book_category_repository.get_by_id(title_data.category_id)

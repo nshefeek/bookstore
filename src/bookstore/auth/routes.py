@@ -11,6 +11,7 @@ from .services import AuthService
 from .dependencies import (
     get_auth_service,
     get_current_active_user,
+    user_is_admin,
     user_is_librarian_or_admin,
 )
 
@@ -66,7 +67,7 @@ async def get_all_users(
     skip: int = 0,
     limit: int = 100,
     auth_service: AuthService = Depends(get_auth_service),
-    current_user: User = Depends(user_is_librarian_or_admin),
+    current_user: User = Depends(user_is_admin),
 ):
     response = await auth_service.get_all_users(skip, limit)
     return response

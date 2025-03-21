@@ -97,6 +97,13 @@ class APIKeyRepository:
         self.session = session
 
     async def create_api_key(self, user_id: UUID, api_key_create: APIKeyCreate) -> tuple[APIKey, str]:
+        api_key_name = api_key_create.name
+        existing = await self.get_by_name(api_key_name)
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="API key already exists",
+            )
         raw_key = generate_api_key()
         hashed_key = hash_api_key(raw_key)
         api_key = APIKey(user_id=user_id, api_key_hash=hashed_key, **api_key_create.model_dump())
@@ -104,6 +111,10 @@ class APIKeyRepository:
         await self.session.commit()
         await self.session.refresh(api_key)
         return api_key, raw_key
+
+    async def get_by_name(self, api_key_name: str) -> Optional[APIKey]:
+        result = await self.session.execute(select(APIKey).where(APIKey.name == api_key_name))
+        return result.scalars().first()
     
     async def get_by_id(self, api_key_id: UUID) -> Optional[APIKey]:
         result = await self.session.execute(select(APIKey).where(APIKey.id == api_key_id))

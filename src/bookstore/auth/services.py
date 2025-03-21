@@ -156,6 +156,7 @@ class AuthService:
             id=api_key.id,
             user_id=api_key.user_id,
             name=api_key.name,
+            api_key_hash=api_key.api_key_hash,
             is_active=api_key.is_active,
             created_at=api_key.created_at,
             updated_at=api_key.updated_at,
@@ -167,7 +168,7 @@ class AuthService:
     
     async def get_api_keys(self, user_id: UUID) -> List[APIKeyFullResponse]:
         api_keys = await self.api_key_repository.get_for_user(user_id)
-        return [APIKeyFullResponse.model_validate(api_key) for api_key in api_keys]
+        return api_keys
     
     async def validate_api_key(self, raw_key: str) -> User:
         if not raw_key:

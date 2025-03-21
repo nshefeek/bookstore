@@ -10,7 +10,9 @@ from .models import BookCategory, BookTitle, Book, BookStatus
 from .schemas import (
     BookCategoryCreate,
     BookCategoryUpdate,
+    BookCategoryFilter,
     BookTitleCreate,
+    BookTitleFilter,
     BookTitleUpdate,
     BookCreate,
     BookUpdate,
@@ -30,8 +32,25 @@ class BookCategoryRepository:
         result = await self.session.execute(select(BookCategory).where(BookCategory.id == category_id))
         return result.scalars().first()
     
-    async def get_all(self) -> List[BookCategory]:
-        result = await self.session.execute(select(BookCategory))
+    async def get_all(self, params: BookCategoryFilter) -> List[BookCategory]:
+        query = select(BookCategory).options(selectinload(BookCategory.books))
+
+        if params.name:
+            query = query.where(BookCategory.name.ilike(f"%{params.name}%"))
+
+        if params.description:
+            query = query.where(BookCategory.description.ilike(f"%{params.description}%"))
+
+        if params.include_books:
+            query = query.options(
+                selectinload(BookCategory.books),
+            )
+
+        result = await self.session.execute(
+            query
+            .limit(params.limit)
+            .offset(params.offset)
+        )
         return result.scalars()._allrows()
 
     async def create_category(self, category_data: BookCategoryCreate) -> BookCategory:
@@ -78,12 +97,31 @@ class BookTitleRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_all(self, limit: int = 100, offset: int = 0) -> List[BookTitle]:
+    async def get_all_titles(self, params: BookTitleFilter) -> List[BookTitle]:
+        query = select(BookTitle).options(selectinload(BookTitle.category))
+
+        if params.title:
+            query = query.where(BookTitle.title.ilike(f"%{params.title}%"))
+
+        if params.author:
+            query = query.where(BookTitle.author.ilike(f"%{params.author}%"))
+
+        if params.isbn:
+            query = query.where(BookTitle.isbn == params.isbn)
+
+        if params.category_name:
+            query = query.join(BookCategory).where(BookCategory.name.ilike(f"%{params.category_name}%"))
+
+        if params.include_copies:
+            query = query.options(
+                selectinload(BookTitle.category),
+                selectinload(BookTitle.copies),
+            )
+
         result = await self.session.execute(
-            select(BookTitle)
-            .options(selectinload(BookTitle.category))
-            .limit(limit)
-            .offset(offset)
+            query
+            .limit(params.limit)
+            .offset(params.offset)
         )
         return result.scalars()._allrows()
 
@@ -107,6 +145,8 @@ class BookTitleRepository:
                 selectinload(BookTitle.category),
                 selectinload(BookTitle.copies),
             )
+        else:
+            query = query.options(selectinload(BookTitle.category))
 
         result = await self.session.execute(query)
         return result.scalars().first()
@@ -220,7 +260,7 @@ class BookRepository:
     async def get_all_for_title(self, title_id: UUID) -> List[Book]:
         result = await self.session.execute(
             select(Book)
-            .where(Book.title_id == title_id)
+            .where(Book.book_title_id == title_id)
             .options(selectinload(Book.book_title))
         )
         return result.scalars()._allrows()
@@ -228,7 +268,7 @@ class BookRepository:
     async def get_all_available_for_title(self, title_id: UUID) -> List[Book]:
         result = await self.session.execute(
             select(Book)
-            .where(Book.title_id == title_id, Book.status == BookStatus.AVAILABLE)
+            .where(Book.book_title_id == title_id, Book.status == BookStatus.AVAILABLE)
             .options(selectinload(Book.book_title))
         )
         return result.scalars()._allrows()

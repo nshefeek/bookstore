@@ -62,6 +62,7 @@ class APIKeyResponse(APIKeyBase):
     id: UUID
     user_id: UUID
     is_active: bool
+    api_key_hash: str
     created_at: datetime
     updated_at: datetime
     last_used_at: Optional[datetime] = None

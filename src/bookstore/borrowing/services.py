@@ -2,14 +2,14 @@ from uuid import UUID
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Query, status
 
 from bookstore.books.models import BookStatus
 from bookstore.books.repositories import BookRepository
 
 from .models import BorrowRecord, BookRequest, BorrowStatus, BookRequestStatus
 from .repositories import BorrowRecordRepository, BookRequestRepository
-from .schemas import BookRequestCreate, BorrowRecordCreate, BorrowHistoryFilter, BookRequestFilter
+from .schemas import BookRequestCreate, BorrowRecordCreate, BorrowHistoryFilter, BookRequestFilter, ReturnRequest, BorrowRecordDetail
 
 class BorrowService:
     def __init__(
@@ -26,7 +26,7 @@ class BorrowService:
         return await self.borrow_record_repository.get_all(params)
 
     async def borrow_book(self, borrow_data: BorrowRecordCreate) -> BorrowRecord:
-        book = self.book_repository.get_by_id(borrow_data.book_id)
+        book = await self.book_repository.get_by_id(borrow_data.book_id)
         if not book:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -39,7 +39,7 @@ class BorrowService:
                 detail="Book is not available",
             )
 
-        active_borrow = self.borrow_record_repository.get_active_borrow_for_book(borrow_data.book_id)
+        active_borrow = await self.borrow_record_repository.get_active_borrow_for_book(borrow_data.book_id)
         if active_borrow:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -52,18 +52,18 @@ class BorrowService:
                 detail="Due date cannot be empty",
             )
         
-        if borrow_data.due_date < datetime.now():
+        if borrow_data.due_date < datetime.now(timezone.utc):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Due date cannot be in the past",
             )
+        await self.book_repository.update_status(book_id=borrow_data.book_id, book_status=BookStatus.BORROWED)
         borrow = await self.borrow_record_repository.create_borrow_record(borrow_data)
-        await self.book_repository.update_book_status(book_id=borrow_data.book_id, status=BookStatus.BORROWED)
 
         return borrow
 
-    async def return_book(self, borrow_id: UUID) -> BorrowRecord:
-        borrow_record = self.borrow_record_repository.get_by_id(borrow_id)
+    async def return_book(self, return_data: ReturnRequest) -> BorrowRecord:
+        borrow_record = await self.borrow_record_repository.get_by_id(return_data.borrow_id)
         if not borrow_record:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -75,8 +75,8 @@ class BorrowService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Book is not borrowed {borrow_record.status}",
             )
-        updated_record = await self.borrow_record_repository.mark_borrow_as_returned(borrow_id, return_date=datetime.now(timezone.utc))
-        await self.book_repository.update_book_status(book_id=borrow_record.book_id, status=BookStatus.AVAILABLE)
+        await self.book_repository.update_status(book_id=borrow_record.book_id, book_status=BookStatus.AVAILABLE)
+        updated_record = await self.borrow_record_repository.mark_borrow_as_returned(return_data)
         return updated_record
 
     async def mark_borrow_as_lost(self, borrow_id: UUID) -> BorrowRecord:
@@ -92,18 +92,16 @@ class BorrowService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Book is not borrowed {borrow_record.status}",
             )
+        await self.book_repository.update_status(book_id=borrow_record.book_id, book_status=BookStatus.LOST)
         updated_record = await self.borrow_record_repository.mark_borrow_as_lost(borrow_id)
-        await self.book_repository.update_book_status(book_id=borrow_record.book_id, status=BookStatus.LOST)
         return updated_record
 
     async def get_reader_borrow_history(
         self,
         reader_id: UUID,
-        status: Optional[List[BorrowStatus]] = None,
-        offset: int = 0,
-        limit: int = 100,
+        params: BorrowHistoryFilter = Query(...),
     ) -> List[BorrowRecord]:
-        return await self.borrow_record_repository.get_reader_borrow_history(reader_id, status, offset, limit)
+        return await self.borrow_record_repository.get_reader_borrow_history(reader_id, params)
 
     async def get_active_borrows_for_reader(self, reader_id: UUID) -> List[BorrowRecord]:
         return await self.borrow_record_repository.get_active_borrows_for_reader(reader_id)
@@ -111,7 +109,7 @@ class BorrowService:
     async def get_overdue_borrows_for_reader(self, reader_id: UUID) -> List[BorrowRecord]:
         return await self.borrow_record_repository.get_overdue_borrows_for_reader(reader_id)
 
-    async def get_borrow_details(self, borrow_id: UUID) -> Tuple[BorrowRecord, Dict[str, Any]]:
+    async def get_borrow_details(self, borrow_id: UUID) -> BorrowRecordDetail:
         record = await self.borrow_record_repository.get_by_id(borrow_id)
         if not record:
             raise HTTPException(
@@ -126,20 +124,28 @@ class BorrowService:
                 detail="Book not found",
             )
         
-        book_details = await self.cache.get(f"book:{book.id}")
-        if not book_details:
-            self.cache.set(
-                f"book:{book.id}",
-                {
-                    "title": book.book_title,
-                    "author": book.book_title.author,
-                    "genre": book.book_title.category,
-                    "description": book.book_title.description,
-                    "barcode": book.barcode,
-                }
-            )
+        # book_details = await self.cache.get(f"book:{book.id}")
+        # if not book_details:
+        #     self.cache.set(
+        #         f"book:{book.id}",
+        #         {
+        #             "title": book.book_title,
+        #             "author": book.book_title.author,
+        #             "genre": book.book_title.category,
+        #             "description": book.book_title.description,
+        #             "barcode": book.barcode,
+        #         }
+        #     )
+
+        book_details = {
+                "title": book.book_title.title,
+                "author": book.book_title.author,
+                "category": book.book_title.category,
+                "description": book.book_title.description,
+                "barcode": book.barcode,
+            }
         
-        return record, book_details
+        return BorrowRecordDetail(borrow_record=record, book_details=book_details)
 
     async def request_book(self, request_data: BookRequestCreate) -> BookRequest:
         book = await self.book_repository.get_by_id(request_data.book_id)

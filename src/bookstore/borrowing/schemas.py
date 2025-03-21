@@ -2,8 +2,9 @@ from uuid import UUID
 from datetime import datetime, timezone
 from typing import List, Optional
 
-
 from pydantic import BaseModel, Field
+
+from bookstore.books.schemas import BookDetailResponse
 
 from .models import BorrowStatus, BookRequestStatus
 
@@ -41,16 +42,21 @@ class BorrowRecordResponse(BorrowRecord):
 
 class ReturnRequest(BaseModel):
     borrow_id: UUID
+    returned_date: datetime = datetime.now(timezone.utc)
 
     class Config:
         json_encoders = {UUID: str}
 
 
 class BorrowHistoryFilter(BaseModel):
-    status: Optional[List[BorrowStatus]] = None
+    borrow_status: Optional[List[BorrowStatus]] = None
     offset: int = Field(default=0, ge=0)
     limit: int = Field(default=10, ge=1, le=100)
 
+
+class BorrowRecordDetail(BaseModel):
+    borrow_record: BorrowRecordResponse
+    book_details: BookDetailResponse
 
 class BookRequest(BaseModel):
     book_id: UUID
